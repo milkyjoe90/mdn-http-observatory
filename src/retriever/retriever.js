@@ -1,6 +1,8 @@
 import { AxiosHeaders } from "axios";
 import { CONFIG } from "../config.js";
 import { HTML_TYPES, Requests } from "../types.js";
+import { mergeRequestPolicies } from "./request-policy.js";
+import { createRequestSigningHeadersSignerFromConfig } from "./request-signing.js";
 import { Session, getPageText } from "./session.js";
 import { urls } from "./url.js";
 import { parseHttpEquivHeaders } from "./utils.js";
@@ -37,13 +39,33 @@ export function buildRequestHeaders({
 export async function retrieve(site, options = {}) {
   const retrievals = new Requests(site);
   const { http: httpUrl, https: httpsUrl } = await urls(site, options);
+  const requestPolicy = mergeRequestPolicies(
+    CONFIG.retriever.requestPolicy,
+    options.requestPolicy
+  );
+  const requestSigner = requestPolicy?.enableRequestSigning
+    ? createRequestSigningHeadersSignerFromConfig(CONFIG.retriever.requestSigning)
+    : null;
+  if (requestPolicy?.enableRequestSigning && !requestSigner) {
+    throw new Error(
+      "Request signing is enabled but retriever.requestSigning.privateKeyPath is not configured."
+    );
+  }
 
   const { http: httpHeaders, https: httpsHeaders } =
     buildRequestHeaders(options);
 
   const [httpSession, httpsSession] = await Promise.all([
-    Session.fromUrl(httpUrl, { headers: httpHeaders }),
-    Session.fromUrl(httpsUrl, { headers: httpsHeaders }),
+    Session.fromUrl(httpUrl, {
+      headers: httpHeaders,
+      requestPolicy,
+      requestSigner,
+    }),
+    Session.fromUrl(httpsUrl, {
+      headers: httpsHeaders,
+      requestPolicy,
+      requestSigner,
+    }),
   ]);
 
   if (!httpSession && !httpsSession) {
@@ -55,7 +77,7 @@ export async function retrieve(site, options = {}) {
 
   // use the http redirect chain
   retrievals.responses.httpRedirects = httpSession.redirectHistory;
-  retrievals.responses.httpsRedirects = httpSession.redirectHistory;
+  retrievals.responses.httpsRedirects = httpsSession.redirectHistory;
 
   if (httpsSession.clientInstanceRecordingRedirects) {
     retrievals.responses.auto = httpsSession.response;

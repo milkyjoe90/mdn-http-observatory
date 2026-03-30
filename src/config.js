@@ -1,4 +1,6 @@
 import convict from "convict";
+import { existsSync } from "node:fs";
+import path from "node:path";
 
 const SCHEMA = {
   retriever: {
@@ -26,6 +28,55 @@ const SCHEMA = {
       format: "Number",
       default: 9000,
       env: "CLIENT_TIMEOUT",
+    },
+    requestPolicy: {
+      enableRequestSigning: {
+        doc: "Enable request signing for retriever requests.",
+        format: "Boolean",
+        default: false,
+      },
+      sendCustomerHeadersOverHttp: {
+        doc: "Also send configured customer headers over HTTP.",
+        format: "Boolean",
+        default: false,
+      },
+      customerHeaders: {
+        doc: "Configured customer headers to send with retriever requests.",
+        format: Object,
+        default: {},
+      },
+    },
+    requestSigning: {
+      privateKeyPath: {
+        doc: "Path to the PKCS#8 PEM private key used for request signing.",
+        format: "String",
+        default: "",
+      },
+      signatureAgent: {
+        doc: "Signature-Agent directory URL for signed requests.",
+        format: "String",
+        default: "",
+      },
+      acceptHeader: {
+        doc: "Default Accept header for signed requests.",
+        format: "String",
+        default: "",
+      },
+      userAgent: {
+        doc: "Default User-Agent header for signed requests.",
+        format: "String",
+        default: "",
+      },
+      keyId: {
+        doc: "Explicit key id to use for signed requests.",
+        format: "String",
+        default: "",
+      },
+      tag: {
+        doc: "Tag to use for signed requests.",
+        format: "String",
+        default: "",
+      },
     },
   },
   database: {
@@ -123,10 +174,22 @@ export function load(configFile) {
       configuration.loadFile(configFile);
     }
     configuration.validate({ allowed: "strict" });
-    return configuration.getProperties();
+    const properties = configuration.getProperties();
+    const privateKeyPath = properties.retriever.requestSigning.privateKeyPath;
+    if (configFile && privateKeyPath && !path.isAbsolute(privateKeyPath)) {
+      properties.retriever.requestSigning.privateKeyPath = path.resolve(
+        path.dirname(configFile),
+        privateKeyPath
+      );
+    }
+    return properties;
   } catch (e) {
     throw new Error(`error reading config: ${e}`);
   }
 }
 
-export const CONFIG = load(process.env["CONFIG_FILE"]);
+export const DEFAULT_CONFIG_FILE = "config/config.json";
+export const CONFIG = load(
+  process.env["CONFIG_FILE"] ||
+    (existsSync(DEFAULT_CONFIG_FILE) ? DEFAULT_CONFIG_FILE : undefined)
+);
