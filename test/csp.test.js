@@ -470,7 +470,7 @@ describe("Content Security Policy", () => {
     setHeader(
       requests.responses.auto,
       "Content-Security-Policy-Report-Only",
-      "default-src 'none'; report-to /_/csp-reports"
+      "default-src 'none'; script-src 'unsafe-inline'; report-to /_/csp-reports"
     );
     const result = contentSecurityPolicyTest(requests);
 
@@ -478,6 +478,18 @@ describe("Content Security Policy", () => {
       result["result"],
       Expectation.CspNotImplementedButReportingEnabled
     );
+    assert.equal(result["numPolicies"], 1);
+    assert.isFalse(result["pass"]);
+    assert.isTrue(result["http"]);
+    assert.isFalse(result["meta"]);
+    assert.deepEqual(result.data, {
+      "default-src": ["'none'"],
+      "report-to": ["/_/csp-reports"],
+      "script-src": ["'unsafe-inline'"],
+    });
+    assert.isNotNull(result["policy"]);
+    assert.isTrue(result["policy"]["defaultNone"]);
+    assert.isTrue(result["policy"]["unsafeInline"]);
   });
   it("multiple CSP headers combined per RFC 9110 are not treated as invalid", async () => {
     // Per RFC 9110 section 5.3, when a server sends multiple Content-Security-Policy headers,

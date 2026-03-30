@@ -89,6 +89,19 @@ function startsWithNoncesHash(sources) {
 }
 
 /**
+ * @param {Map<string, Set<string>>} csp
+ * @returns {Map<string, Set<string>>}
+ */
+function cloneCsp(csp) {
+  return new Map(
+    [...csp.entries()].map(([directive, sources]) => [
+      directive,
+      new Set(sources),
+    ])
+  );
+}
+
+/**
  *
  * @param {Requests} requests
  * @param {Expectation} [expectation]
@@ -108,6 +121,10 @@ export function contentSecurityPolicyTest(
   }
 
   const httpCspHeader = getHttpHeaders(response, CONTENT_SECURITY_POLICY);
+  const httpCspReportOnly = getHttpHeaders(
+    response,
+    CONTENT_SECURITY_POLICY_REPORT_ONLY
+  );
   const equivCspHeader =
     response?.httpEquiv?.get(CONTENT_SECURITY_POLICY) ?? [];
 
@@ -147,25 +164,32 @@ export function contentSecurityPolicyTest(
   // We sum up the header and meta (filtered for validity) sizes,
   // so a single meta tag with a disallowed directive comes out
   // as csp-not-implemented
-  if (httpHeaderOnlyCsp.size + metaCsp.size === 0) {
-    // Content-Security-Policy-Report-Only is only allowed in headers, not in meta tags
-    // see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy-Report-Only
-    const httpCspReportOnly =
-      // @ts-ignore
-      response.headers.get(CONTENT_SECURITY_POLICY_REPORT_ONLY) ?? null;
-    if (httpCspReportOnly) {
-      output.result = Expectation.CspNotImplementedButReportingEnabled;
-    } else {
+  const hasEnforcedCsp = httpHeaderOnlyCsp.size + metaCsp.size > 0;
+  if (!hasEnforcedCsp) {
+    if (httpCspReportOnly.length === 0) {
       output.result = Expectation.CspNotImplemented;
+      return output;
     }
-    return output;
+
+    try {
+      csp = parseCsp(httpCspReportOnly);
+      httpHeaderOnlyCsp = cloneCsp(csp);
+    } catch (e) {
+      output.result = Expectation.CspNotImplementedButReportingEnabled;
+      output.numPolicies = httpCspReportOnly.length;
+      return output;
+    }
+
+    metaCsp = new Map();
+    output.result = Expectation.CspNotImplementedButReportingEnabled;
+    output.numPolicies = httpCspReportOnly.length;
   }
 
   output.policy = new Policy();
 
   // mark whether we saw csp there or not
-  output.http = httpCspPolicies?.length > 0;
-  output.meta = equivCspPolicies?.length > 0;
+  output.http = httpCspPolicies.length > 0 || httpCspReportOnly.length > 0;
+  output.meta = equivCspPolicies.length > 0;
 
   // Get the various directives we look at
   const base_uri = csp.get("base-uri") || new Set(["*"]);
