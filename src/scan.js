@@ -3,6 +3,7 @@
 import { Command } from "commander";
 import { scan } from "./scanner/index.js";
 import { Site } from "./site.js";
+import { normalizeHeaderEntries } from "./retriever/request-policy.js";
 
 /**
  * @param {string} json
@@ -15,7 +16,36 @@ export function parseHeadersOption(json) {
   } catch {
     throw new Error("Invalid JSON for --headers");
   }
-  return Object.entries(parsed).map(([k, v]) => `${k}: ${v}`);
+  return normalizeHeaderEntries(parsed).map(
+    ({ name, value }) => `${name}: ${value}`
+  );
+}
+
+export function formatScanResult(result) {
+  return {
+    scan: result.scan,
+    tests: Object.fromEntries(
+      Object.entries(result.tests).map(([key, test]) => {
+        const { scoreDescription, ...rest } = test;
+        return [key, rest];
+      })
+    ),
+  };
+}
+
+/**
+ * @param {{ headers?: string, sendHeadersOverHttp?: boolean }} options
+ * @returns {import("./types.js").RequestPolicyInput | undefined}
+ */
+export function buildCliRequestPolicy({ headers, sendHeadersOverHttp } = {}) {
+  if (!headers && !sendHeadersOverHttp) {
+    return undefined;
+  }
+
+  return {
+    ...(headers ? { customerHeaders: parseHeadersOption(headers) } : {}),
+    ...(sendHeadersOverHttp ? { sendCustomerHeadersOverHttp: true } : {}),
+  };
 }
 
 const NAME = "mdn-http-observatory-scan";
@@ -38,24 +68,16 @@ program
     try {
       /** @type {import("./types.js").ScanOptions} */
       const scanOptions = {};
-      if (options.headers) {
-        scanOptions.customHeaders = parseHeadersOption(options.headers);
-      }
-      if (options.sendHeadersOverHttp) {
-        scanOptions.sendHeadersOverHttp = true;
+      const requestPolicy = buildCliRequestPolicy({
+        headers: options.headers,
+        sendHeadersOverHttp: options.sendHeadersOverHttp,
+      });
+      if (requestPolicy) {
+        scanOptions.requestPolicy = requestPolicy;
       }
       const site = Site.fromSiteString(siteString);
       const result = await scan(site, scanOptions);
-      const tests = Object.fromEntries(
-        Object.entries(result.tests).map(([key, test]) => {
-          const { scoreDescription, ...rest } = test;
-          return [key, rest];
-        })
-      );
-      const ret = {
-        scan: result.scan,
-        tests: tests,
-      };
+      const ret = formatScanResult(result);
       console.log(JSON.stringify(ret, null, 2));
     } catch (e) {
       if (e instanceof Error) {

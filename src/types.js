@@ -229,10 +229,33 @@ export const Expectation = {
  * @typedef {Object} ScanOptions
  * @prop {string[]} [customHeaders]
  * @prop {boolean} [sendHeadersOverHttp]
+ * @prop {RequestPolicyInput} [requestPolicy]
  * @prop {string[]} [cookies]
  * @prop {number} [httpPort]
  * @prop {number} [httpsPort]
  * @prop {string} [path]
+ */
+
+/**
+ * @typedef {Object} RequestPolicyInput
+ * @prop {Record<string, string> | string[] | NormalizedHeaderEntry[]} [customerHeaders]
+ * @prop {Record<string, string> | string[] | NormalizedHeaderEntry[]} [headers]
+ * @prop {boolean} [enableRequestSigning]
+ * @prop {boolean} [sendHeadersOverHttp]
+ * @prop {boolean} [sendCustomerHeadersOverHttp]
+ */
+
+/**
+ * @typedef {Object} NormalizedHeaderEntry
+ * @prop {string} name
+ * @prop {string} value
+ */
+
+/**
+ * @typedef {Object} NormalizedRequestPolicy
+ * @prop {boolean} enableRequestSigning
+ * @prop {boolean} sendCustomerHeadersOverHttp
+ * @prop {NormalizedHeaderEntry[]} customerHeaders
  */
 
 // MIME types for HTML requests

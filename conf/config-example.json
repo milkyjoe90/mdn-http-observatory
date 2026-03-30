@@ -1,4 +1,19 @@
 {
+  "retriever": {
+    "requestPolicy": {
+      "enableRequestSigning": false,
+      "sendCustomerHeadersOverHttp": false,
+      "customerHeaders": {}
+    },
+    "requestSigning": {
+      "privateKeyPath": "",
+      "signatureAgent": "",
+      "acceptHeader": "",
+      "userAgent": "",
+      "keyId": "",
+      "tag": ""
+    }
+  },
   "database": {
     "database": "observatory",
     "user": "postgres"

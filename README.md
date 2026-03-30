@@ -35,7 +35,34 @@ You can pass custom request headers as JSON using the `--headers` option:
 mdn-http-observatory-scan --headers '{"X-Custom": "value"}' mdn.dev
 ```
 
-**Warning:** Headers will also be sent on unencrypted HTTP requests, even if the host enforces HTTPS. Do not pass sensitive data.
+Custom headers are only sent over HTTPS by default. If you need to send them on unencrypted HTTP requests as well, add `--send-headers-over-http`.
+
+For repeatable authenticated scans, put the default request policy in `config/config.json`, or point `CONFIG_FILE` at a different file. This lets you define customer headers once and optionally enable request signing with a PEM file on disk:
+
+```json
+{
+  "retriever": {
+    "requestPolicy": {
+      "enableRequestSigning": true,
+      "sendCustomerHeadersOverHttp": false,
+      "customerHeaders": {
+        "Authorization": "Bearer YOUR_TOKEN",
+        "X-Bot-Id": "bot-123"
+      }
+    },
+    "requestSigning": {
+      "privateKeyPath": "./request-signing-key.pem",
+      "signatureAgent": "https://bot.example.com",
+      "acceptHeader": "text/html",
+      "userAgent": "MyBot/1.0 (+https://example.com/bot)",
+      "keyId": "",
+      "tag": "request-signing"
+    }
+  }
+}
+```
+
+Relative `privateKeyPath` values are resolved relative to the directory containing the config file. One-off `--headers` values are merged on top of any configured `customerHeaders`.
 
 Both methods return a JSON response of the following form:
 
@@ -73,13 +100,39 @@ This needs a [postgres](https://www.postgresql.org/) database for the API to use
 
 #### Configuration
 
-Default configuration is read from a default `config/config.json` file. See [this file](src/config.js) for a list of possible configuration options.
+By default, the application looks for configuration in `config/config.json`. Set `CONFIG_FILE` to override that location. See [this file](src/config.js) for the supported configuration schema.
 
-Create a configuration file by copying the [`config/config-example.json`](conf/config-example.json) to `config/config.json`.
-Put in your database credentials into `config/config.json`:
+Create a configuration file by copying [`conf/config-example.json`](conf/config-example.json) to `config/config.json`:
+
+```sh
+cp conf/config-example.json config/config.json
+```
+
+If you want to keep the file somewhere else, set `CONFIG_FILE` before running the CLI or server:
+
+```sh
+export CONFIG_FILE=/path/to/config.json
+```
+
+Put in your database credentials and any retriever request policy or request signing settings:
 
 ```json
 {
+  "retriever": {
+    "requestPolicy": {
+      "enableRequestSigning": false,
+      "sendCustomerHeadersOverHttp": false,
+      "customerHeaders": {}
+    },
+    "requestSigning": {
+      "privateKeyPath": "",
+      "signatureAgent": "",
+      "acceptHeader": "",
+      "userAgent": "",
+      "keyId": "",
+      "tag": ""
+    }
+  },
   "database": {
     "database": "observatory",
     "user": "postgres"
