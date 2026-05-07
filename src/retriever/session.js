@@ -74,7 +74,12 @@ export class Session {
    */
   constructor(
     url,
-    { headers: headerParams, cookies: _cookies, requestPolicy, requestSigner } = {}
+    {
+      headers: headerParams,
+      cookies: _cookies,
+      requestPolicy,
+      requestSigner,
+    } = {}
   ) {
     this.redirectHistory = [];
     this.redirectCount = 0;

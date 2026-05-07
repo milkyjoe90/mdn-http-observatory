@@ -44,7 +44,9 @@ export async function retrieve(site, options = {}) {
     options.requestPolicy
   );
   const requestSigner = requestPolicy?.enableRequestSigning
-    ? createRequestSigningHeadersSignerFromConfig(CONFIG.retriever.requestSigning)
+    ? createRequestSigningHeadersSignerFromConfig(
+        CONFIG.retriever.requestSigning
+      )
     : null;
   if (requestPolicy?.enableRequestSigning && !requestSigner) {
     throw new Error(

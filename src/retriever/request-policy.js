@@ -1,10 +1,7 @@
 const MANAGED_HEADER_NAMES = new Set(
-  [
-    "signature",
-    "signature-agent",
-    "signature-input",
-    "content-digest",
-  ].map((name) => name.toLowerCase())
+  ["signature", "signature-agent", "signature-input", "content-digest"].map(
+    (name) => name.toLowerCase()
+  )
 );
 
 const VALID_HEADER_NAME_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
@@ -160,7 +157,7 @@ export function mergeRequestPolicies(...requestPolicies) {
       continue;
     }
 
-    mergedRequestPolicy.enableRequestSigning ||= 
+    mergedRequestPolicy.enableRequestSigning ||=
       normalizedRequestPolicy.enableRequestSigning;
     mergedRequestPolicy.sendCustomerHeadersOverHttp ||=
       normalizedRequestPolicy.sendCustomerHeadersOverHttp;
