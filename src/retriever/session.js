@@ -70,7 +70,7 @@ export class Session {
   /**
    *
    * @param {URL} url
-   * @param {{ headers?: string[]; cookies?: string[]; requestPolicy?: import("../types.js").RequestPolicyInput; requestSigner?: import("./request-signing.js").RequestSigningHeadersSigner | null; }} [options = {}]
+   * @param {{ headers?: string[]; cookies?: string[]; requestPolicy?: import("../types.js").RequestPolicyInput | import("../types.js").NormalizedRequestPolicy | null; requestSigner?: import("./request-signing.js").RequestSigningHeadersSigner | null; }} [options = {}]
    */
   constructor(
     url,
@@ -124,6 +124,9 @@ export class Session {
     this.installRequestPolicyInterceptor(this.clientInstance);
   }
 
+  /**
+   * @returns {(config: import("axios").InternalAxiosRequestConfig) => import("axios").InternalAxiosRequestConfig}
+   */
   createRequestInterceptor() {
     const that = this;
     return function (config) {
@@ -133,10 +136,20 @@ export class Session {
 
       const requestUrl = new URL(config.url, that.url.href);
       const originalHeaders = new AxiosHeaders(config.headers);
+      /** @type {Record<string, string>} */
+      const existingHeaders = Object.create(null);
+      for (const [name, value] of Object.entries(originalHeaders.toJSON())) {
+        if (value == null) {
+          continue;
+        }
+        existingHeaders[name] = Array.isArray(value)
+          ? value.map(String).join(", ")
+          : String(value);
+      }
       const { customerHeaders, managedHeaders } = resolveRequestPolicyHeaders({
         requestUrl,
         method: config.method,
-        existingHeaders: originalHeaders.toJSON(),
+        existingHeaders,
         data: config.data,
         requestPolicy: that.requestPolicy,
         requestSigner: that.requestSigner,
@@ -150,6 +163,10 @@ export class Session {
     };
   }
 
+  /**
+   * @param {import("axios").AxiosInstance} client
+   * @returns {void}
+   */
   installRequestPolicyInterceptor(client) {
     if (!this.requestPolicy) {
       return;
@@ -275,7 +292,7 @@ export class Session {
   /**
    *
    * @param {URL} url
-   * @param {{ headers?: string[]; cookies?: string[]; requestPolicy?: import("../types.js").RequestPolicyInput; requestSigner?: import("./request-signing.js").RequestSigningHeadersSigner | null; }} [options = {}]
+   * @param {{ headers?: string[]; cookies?: string[]; requestPolicy?: import("../types.js").RequestPolicyInput | import("../types.js").NormalizedRequestPolicy | null; requestSigner?: import("./request-signing.js").RequestSigningHeadersSigner | null; }} [options = {}]
    * @returns Session
    */
   static async fromUrl(

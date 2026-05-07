@@ -9,10 +9,18 @@ const MANAGED_HEADER_NAMES = new Set(
 
 const VALID_HEADER_NAME_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
 function hasControlCharacters(value) {
   return /[\0-\x1F\x7F]/.test(value);
 }
 
+/**
+ * @param {unknown} name
+ * @returns {string}
+ */
 function normalizeHeaderName(name) {
   const normalizedName = String(name).trim();
   if (!VALID_HEADER_NAME_PATTERN.test(normalizedName)) {
@@ -21,6 +29,10 @@ function normalizeHeaderName(name) {
   return normalizedName;
 }
 
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
 function normalizeHeaderValue(value) {
   const normalizedValue = String(value ?? "");
   if (hasControlCharacters(normalizedValue)) {
@@ -29,6 +41,10 @@ function normalizeHeaderValue(value) {
   return normalizedValue.trim();
 }
 
+/**
+ * @param {unknown} headers
+ * @returns {import("../types.js").NormalizedHeaderEntry[]}
+ */
 export function normalizeHeaderEntries(headers) {
   if (headers == null) {
     return [];
@@ -78,15 +94,21 @@ export function normalizeHeaderEntries(headers) {
     .filter((entry) => entry.name !== "");
 }
 
+/**
+ * @param {import("../types.js").NormalizedHeaderEntry[]} entries
+ * @returns {Record<string, string>}
+ */
 function toHeaderObject(entries) {
+  /** @type {Record<string, string>} */
+  const result = Object.create(null);
   return entries.reduce((acc, entry) => {
     acc[entry.name] = entry.value;
     return acc;
-  }, Object.create(null));
+  }, result);
 }
 
 /**
- * @param {import("../types.js").RequestPolicyInput | undefined} requestPolicy
+ * @param {import("../types.js").RequestPolicyInput | import("../types.js").NormalizedRequestPolicy | null | undefined} requestPolicy
  * @returns {import("../types.js").NormalizedRequestPolicy | null}
  */
 export function normalizeRequestPolicy(requestPolicy) {
@@ -95,14 +117,17 @@ export function normalizeRequestPolicy(requestPolicy) {
   }
 
   const customerHeaders = normalizeHeaderEntries(
-    requestPolicy.customerHeaders ?? requestPolicy.headers
+    requestPolicy.customerHeaders ??
+      ("headers" in requestPolicy ? requestPolicy.headers : undefined)
   );
 
+  /** @type {import("../types.js").NormalizedRequestPolicy} */
   const normalizedRequestPolicy = {
     enableRequestSigning: requestPolicy.enableRequestSigning === true,
     sendCustomerHeadersOverHttp:
       requestPolicy.sendCustomerHeadersOverHttp === true ||
-      requestPolicy.sendHeadersOverHttp === true,
+      ("sendHeadersOverHttp" in requestPolicy &&
+        requestPolicy.sendHeadersOverHttp === true),
     customerHeaders,
   };
 
@@ -122,6 +147,7 @@ export function normalizeRequestPolicy(requestPolicy) {
  * @returns {import("../types.js").NormalizedRequestPolicy | null}
  */
 export function mergeRequestPolicies(...requestPolicies) {
+  /** @type {import("../types.js").NormalizedRequestPolicy} */
   const mergedRequestPolicy = {
     enableRequestSigning: false,
     sendCustomerHeadersOverHttp: false,

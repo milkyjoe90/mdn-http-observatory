@@ -22,6 +22,10 @@ export function parseHeadersOption(json) {
   );
 }
 
+/**
+ * @param {{ scan: unknown, tests: Record<string, any> }} result
+ * @returns {{ scan: unknown, tests: Record<string, any> }}
+ */
 export function formatScanResult(result) {
   return {
     scan: result.scan,

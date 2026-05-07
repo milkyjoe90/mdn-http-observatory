@@ -155,6 +155,7 @@ describe("request policy", () => {
     assert.throws(
       () =>
         normalizeRequestPolicy({
+          // @ts-expect-error Invalid input is intentional for validation coverage.
           customerHeaders: "X-Test: value",
         }),
       /Invalid customer header collection/
@@ -262,7 +263,11 @@ describe("request policy", () => {
     assert.include(headers["Signature-Input"], '"accept"');
     assert.include(headers["Signature-Input"], '"user-agent"');
     assert.include(headers["Signature-Input"], '"content-digest"');
-    assert.match(headers.Signature, /^sig2=:/);
+    const signatureHeader = headers.Signature;
+    if (typeof signatureHeader !== "string") {
+      assert.fail("Expected Signature header to be present.");
+    }
+    assert.match(signatureHeader, /^sig2=:/);
   });
 
   it("lets customer headers override request defaults when signing", () => {

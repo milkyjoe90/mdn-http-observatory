@@ -164,7 +164,7 @@ const SCHEMA = {
 
 /**
  *
- * @param {string | undefined} configFile
+ * @param {string | undefined} [configFile]
  * @returns
  */
 export function load(configFile) {

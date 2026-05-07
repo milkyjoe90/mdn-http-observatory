@@ -14,6 +14,20 @@ const DEFAULT_USER_AGENT =
 const DEFAULT_EXPIRY_TTL_SECONDS = 120;
 const DEFAULT_SIGNATURE_TAG = "request-signing";
 
+/**
+ * @typedef {Object} RequestSigningConfig
+ * @property {string} [privateKeyPath]
+ * @property {string} [signatureAgent]
+ * @property {string} [acceptHeader]
+ * @property {string} [userAgent]
+ * @property {string} [keyId]
+ * @property {string} [tag]
+ */
+
+/**
+ * @param {string | null | undefined} url
+ * @returns {string}
+ */
 function normalizeSignatureAgent(url) {
   if (!url) {
     return DEFAULT_SIGNATURE_AGENT;
@@ -27,19 +41,11 @@ function normalizeSignatureAgent(url) {
   }
 }
 
-function toBase64Url(value) {
-  return Buffer.from(value)
-    .toString("base64")
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replaceAll("=", "");
-}
-
+/**
+ * @param {URL} uri
+ * @returns {string}
+ */
 function getAuthority(uri) {
-  if (!uri) {
-    return "";
-  }
-
   const defaultPort =
     (uri.protocol === "https:" && uri.port === "443") ||
     (uri.protocol === "http:" && uri.port === "80") ||
@@ -47,21 +53,25 @@ function getAuthority(uri) {
   return defaultPort ? uri.hostname : `${uri.hostname}:${uri.port}`;
 }
 
+/**
+ * @param {unknown} data
+ * @returns {Uint8Array<ArrayBuffer> | null}
+ */
 function toBodyBytes(data) {
   if (!data) {
     return null;
   }
 
   if (Buffer.isBuffer(data)) {
-    return data;
+    return new Uint8Array(data);
   }
 
   if (typeof data === "string") {
-    return Buffer.from(data);
+    return new TextEncoder().encode(data);
   }
 
   if (data instanceof Uint8Array) {
-    return Buffer.from(data);
+    return new Uint8Array(data);
   }
 
   return null;
@@ -82,17 +92,15 @@ export class RequestSigningHeadersSigner {
     const exported = this.publicKey.export({ format: "jwk" });
     this.kid =
       options.kid ||
-      toBase64Url(
-        createHash("sha256")
-          .update(
-            JSON.stringify({
-              crv: exported.crv,
-              kty: exported.kty,
-              x: exported.x,
-            })
-          )
-          .digest()
-      );
+      createHash("sha256")
+        .update(
+          JSON.stringify({
+            crv: exported.crv,
+            kty: exported.kty,
+            x: exported.x,
+          })
+        )
+        .digest("base64url");
     this.signatureAgent = normalizeSignatureAgent(options.signatureAgent);
     this.acceptHeader =
       options.acceptHeader && options.acceptHeader.trim() !== ""
@@ -169,7 +177,7 @@ export class RequestSigningHeadersSigner {
 
     const signature = sign(
       null,
-      Buffer.from(signatureBaseLines.join("\n")),
+      new TextEncoder().encode(signatureBaseLines.join("\n")),
       this.privateKey
     ).toString("base64");
 
@@ -177,6 +185,7 @@ export class RequestSigningHeadersSigner {
       " "
     )});created=${created};expires=${expires};alg="ed25519";keyid="${this.kid}";tag="${this.tag}"`;
 
+    /** @type {Record<string, string>} */
     const headers = {
       "User-Agent": userAgent,
       Accept: accept,
@@ -193,6 +202,10 @@ export class RequestSigningHeadersSigner {
   }
 }
 
+/**
+ * @param {RequestSigningConfig} [config]
+ * @returns {RequestSigningHeadersSigner | null}
+ */
 export function createRequestSigningHeadersSignerFromConfig(config = {}) {
   const privateKeyPath = config.privateKeyPath?.trim();
   if (!privateKeyPath) {
