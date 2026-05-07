@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { createHash } from "node:crypto";
 import { assert } from "chai";
+import { AxiosHeaders } from "axios";
 import {
   createRequestSigningHeadersSignerFromConfig,
   RequestSigningHeadersSigner,
@@ -17,6 +18,23 @@ import {
 
 const testPem =
   "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIFyanLfQsoXbxClFLDeTcepr5MpqIv6ZzvO7Mqkj5mlL\n-----END PRIVATE KEY-----";
+
+/**
+ * @param {Session} session
+ * @param {string} url
+ * @param {Record<string, string>} [headers]
+ * @returns {AxiosHeaders}
+ */
+function applySessionRequestInterceptor(session, url, headers = {}) {
+  const intercept = session.createRequestInterceptor();
+  /** @type {any} */
+  const config = {
+    url,
+    method: "get",
+    headers: new AxiosHeaders(headers),
+  };
+  return new AxiosHeaders(intercept(config).headers);
+}
 
 describe("request policy", () => {
   it("normalizes customer headers from an object", () => {
@@ -108,6 +126,69 @@ describe("request policy", () => {
     assert.deepEqual(result.customerHeaders, {
       Authorization: "Bearer token",
     });
+  });
+
+  it("applies customer headers through the Session interceptor on HTTPS", () => {
+    const session = new Session(new URL("https://example.com/"), {
+      headers: ["Accept: text/html"],
+      requestPolicy: {
+        customerHeaders: {
+          Authorization: "Bearer token",
+          "X-Custom": "value",
+        },
+      },
+    });
+
+    const headers = applySessionRequestInterceptor(
+      session,
+      "https://example.com/path",
+      {
+        Accept: "text/html",
+      }
+    );
+
+    assert.equal(headers.get("Accept"), "text/html");
+    assert.equal(headers.get("Authorization"), "Bearer token");
+    assert.equal(headers.get("X-Custom"), "value");
+  });
+
+  it("keeps customer headers out of HTTP requests through the Session interceptor by default", () => {
+    const session = new Session(new URL("http://example.com/"), {
+      requestPolicy: {
+        customerHeaders: {
+          Authorization: "Bearer token",
+          "X-Custom": "value",
+        },
+      },
+    });
+
+    const headers = applySessionRequestInterceptor(
+      session,
+      "http://example.com/path"
+    );
+
+    assert.isFalse(headers.has("Authorization"));
+    assert.isFalse(headers.has("X-Custom"));
+  });
+
+  it("sends customer headers over HTTP through the Session interceptor when enabled", () => {
+    const session = new Session(new URL("http://example.com/"), {
+      requestPolicy: {
+        customerHeaders: {
+          Authorization: "Bearer token",
+          "X-Custom": "value",
+        },
+        sendCustomerHeadersOverHttp: true,
+      },
+    });
+
+    const headers = applySessionRequestInterceptor(
+      session,
+      "http://example.com/path"
+    );
+
+    assert.equal(headers.get("Authorization"), "Bearer token");
+    assert.equal(headers.get("X-Custom"), "value");
   });
 
   it("filters managed header names from customer headers", () => {
@@ -291,6 +372,37 @@ describe("request policy", () => {
     });
 
     assert.equal(managedHeaders.Accept, "text/plain");
+  });
+
+  it("uses customer headers when signing through the Session interceptor", () => {
+    const signer = new RequestSigningHeadersSigner(testPem, {
+      now: () => 1700000000,
+    });
+    const session = new Session(new URL("https://example.com/"), {
+      requestPolicy: {
+        customerHeaders: {
+          Accept: "text/plain",
+        },
+        enableRequestSigning: true,
+      },
+      requestSigner: signer,
+    });
+
+    const headers = applySessionRequestInterceptor(
+      session,
+      "https://example.com/path",
+      {
+        Accept: "text/html",
+      }
+    );
+
+    assert.equal(headers.get("Accept"), "text/plain");
+    assert.equal(
+      headers.get("Signature-Agent"),
+      '"https://request-signer.invalid/.well-known/http-message-signatures-directory"'
+    );
+    assert.isTrue(headers.has("Signature-Input"));
+    assert.isTrue(headers.has("Signature"));
   });
 
   it("creates a request signer from a configured PEM path", () => {
