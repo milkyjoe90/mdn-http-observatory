@@ -1,9 +1,11 @@
 import { describe, it } from "node:test";
+
 import { assert } from "chai";
 
-import { emptyRequests, setHeader } from "./helpers.js";
 import { contentSecurityPolicyTest } from "../src/analyzer/tests/csp.js";
 import { Expectation } from "../src/types.js";
+
+import { emptyRequests, setHeader } from "./helpers.js";
 
 describe("Content Security Policy", () => {
   it("missing", async () => {
@@ -490,6 +492,29 @@ describe("Content Security Policy", () => {
     assert.isNotNull(result["policy"]);
     assert.isTrue(result["policy"]["defaultNone"]);
     assert.isTrue(result["policy"]["unsafeInline"]);
+  });
+  it("multiple report-only CSP headers combined per RFC 9110 are analyzed separately", async () => {
+    const requests = emptyRequests();
+    setHeader(
+      requests.responses.auto,
+      "Content-Security-Policy-Report-Only",
+      "default-src 'none'; script-src 'self', default-src 'none'; script-src 'self'"
+    );
+
+    const result = contentSecurityPolicyTest(requests);
+
+    assert.equal(
+      result["result"],
+      Expectation.CspNotImplementedButReportingEnabled
+    );
+    assert.equal(result["numPolicies"], 2);
+    assert.isFalse(result["pass"]);
+    assert.isTrue(result["http"]);
+    assert.isFalse(result["meta"]);
+    assert.deepEqual(result.data, {
+      "default-src": ["'none'"],
+      "script-src": ["'self'"],
+    });
   });
   it("multiple CSP headers combined per RFC 9110 are not treated as invalid", async () => {
     // Per RFC 9110 section 5.3, when a server sends multiple Content-Security-Policy headers,

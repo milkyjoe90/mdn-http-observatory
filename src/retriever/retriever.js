@@ -1,6 +1,8 @@
 import { AxiosHeaders } from "axios";
+
 import { CONFIG } from "../config.js";
 import { HTML_TYPES, Requests } from "../types.js";
+
 import { mergeRequestPolicies } from "./request-policy.js";
 import { createRequestSigningHeadersSignerFromConfig } from "./request-signing.js";
 import { Session, getPageText } from "./session.js";
@@ -100,12 +102,8 @@ export async function retrieve(site, options = {}) {
   });
 
   // Do a CORS preflight request
-  const corsUrl = retrievals.session.redirectHistory[
-    retrievals.session.redirectHistory.length - 1
-  ]
-    ? retrievals.session.redirectHistory[
-        retrievals.session.redirectHistory.length - 1
-      ]?.url.href
+  const corsUrl = retrievals.session.redirectHistory.at(-1)
+    ? retrievals.session.redirectHistory.at(-1)?.url.href
     : retrievals.session.url.href;
   const cors_resp =
     (await retrievals.session?.options({
@@ -128,7 +126,7 @@ export async function retrieve(site, options = {}) {
   if (retrievals.responses.auto) {
     if (
       HTML_TYPES.has(
-        retrievals.responses.auto.headers["content-type"]?.split(";")[0]
+        retrievals.responses.auto.headers["content-type"]?.split(";", 1)[0]
       ) &&
       retrievals.resources.path
     ) {

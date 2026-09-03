@@ -1,10 +1,10 @@
-#!/usr/bin/env node
+import { pathToFileURL } from "node:url";
 
 import { Command } from "commander";
+
+import { normalizeHeaderEntries } from "./retriever/request-policy.js";
 import { scan } from "./scanner/index.js";
 import { Site } from "./site.js";
-import { pathToFileURL } from "node:url";
-import { normalizeHeaderEntries } from "./retriever/request-policy.js";
 
 /**
  * @param {string} json
@@ -31,7 +31,7 @@ export function formatScanResult(result) {
     scan: result.scan,
     tests: Object.fromEntries(
       Object.entries(result.tests).map(([key, test]) => {
-        const { scoreDescription, ...rest } = test;
+        const { scoreDescription: _scoreDescription, ...rest } = test;
         return [key, rest];
       })
     ),
@@ -44,12 +44,12 @@ export function formatScanResult(result) {
  */
 export function buildCliRequestPolicy({ headers, sendHeadersOverHttp } = {}) {
   if (!headers && !sendHeadersOverHttp) {
-    return undefined;
+    return;
   }
 
   return {
-    ...(headers ? { customerHeaders: parseHeadersOption(headers) } : {}),
-    ...(sendHeadersOverHttp ? { sendCustomerHeadersOverHttp: true } : {}),
+    ...(headers && { customerHeaders: parseHeadersOption(headers) }),
+    ...(sendHeadersOverHttp && { sendCustomerHeadersOverHttp: true }),
   };
 }
 
@@ -84,9 +84,9 @@ program
       const result = await scan(site, scanOptions);
       const ret = formatScanResult(result);
       console.log(JSON.stringify(ret, null, 2));
-    } catch (e) {
-      if (e instanceof Error) {
-        console.log(JSON.stringify({ error: e.message }));
+    } catch (error) {
+      if (error instanceof Error) {
+        console.log(JSON.stringify({ error: error.message }));
         process.exit(1);
       }
     }

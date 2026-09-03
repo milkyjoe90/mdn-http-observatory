@@ -2,14 +2,15 @@ import {
   CONTENT_SECURITY_POLICY,
   CONTENT_SECURITY_POLICY_REPORT_ONLY,
 } from "../../headers.js";
-import { Requests, Policy, BaseOutput } from "../../types.js";
-import { Expectation } from "../../types.js";
+import { BaseOutput, Expectation, Policy } from "../../types.js";
 import {
   DUPLICATE_WARNINGS_KEY,
   parseCsp,
   parseCspMeta,
 } from "../cspParser.js";
 import { getHttpHeaders } from "../utils.js";
+
+/** @import { Requests } from "../../types.js" */
 
 /**
  * Split a list of raw CSP header values into individual policies.
@@ -34,10 +35,8 @@ const DANGEROUSLY_BROAD = new Set([
   "https://*.*",
 ]);
 const UNSAFE_INLINE = new Set(["'unsafe-inline'", "data:"]);
-const DANGEROUSLY_BROAD_AND_UNSAFE_INLINE = new Set([
-  ...DANGEROUSLY_BROAD,
-  ...UNSAFE_INLINE,
-]);
+const DANGEROUSLY_BROAD_AND_UNSAFE_INLINE =
+  DANGEROUSLY_BROAD.union(UNSAFE_INLINE);
 
 // Passive content check
 const PASSIVE_DIRECTIVES = new Set(["img-src", "media-src"]);
@@ -68,13 +67,6 @@ export class CspOutput extends BaseOutput {
     Expectation.CspNotImplemented,
     Expectation.CspNotImplementedButReportingEnabled,
   ];
-  /**
-   *
-   * @param {Expectation} expectation
-   */
-  constructor(expectation) {
-    super(expectation);
-  }
 }
 
 /**
@@ -94,10 +86,7 @@ function startsWithNoncesHash(sources) {
  */
 function cloneCsp(csp) {
   return new Map(
-    [...csp.entries()].map(([directive, sources]) => [
-      directive,
-      new Set(sources),
-    ])
+    [...csp].map(([directive, sources]) => [directive, new Set(sources)])
   );
 }
 
@@ -121,7 +110,7 @@ export function contentSecurityPolicyTest(
   }
 
   const httpCspHeader = getHttpHeaders(response, CONTENT_SECURITY_POLICY);
-  const httpCspReportOnly = getHttpHeaders(
+  const httpCspReportOnlyHeader = getHttpHeaders(
     response,
     CONTENT_SECURITY_POLICY_REPORT_ONLY
   );
@@ -129,6 +118,7 @@ export function contentSecurityPolicyTest(
     response?.httpEquiv?.get(CONTENT_SECURITY_POLICY) ?? [];
 
   const httpCspPolicies = splitCspHeaders(httpCspHeader);
+  const httpCspReportOnlyPolicies = splitCspHeaders(httpCspReportOnlyHeader);
   const equivCspPolicies = splitCspHeaders(equivCspHeader);
 
   output.numPolicies = equivCspPolicies.length + httpCspPolicies.length;
@@ -144,20 +134,20 @@ export function contentSecurityPolicyTest(
     csp = parseCsp(
       [...httpCspPolicies, ...equivCspPolicies].filter((x) => x !== null)
     );
-  } catch (e) {
+  } catch {
     output.result = Expectation.CspHeaderInvalid;
     return output;
   }
 
   try {
     httpHeaderOnlyCsp = parseCsp(httpCspPolicies);
-  } catch (e) {
+  } catch {
     httpHeaderOnlyCsp = new Map();
   }
 
   try {
     metaCsp = parseCspMeta(equivCspPolicies);
-  } catch (e) {
+  } catch {
     metaCsp = new Map();
   }
 
@@ -166,29 +156,31 @@ export function contentSecurityPolicyTest(
   // as csp-not-implemented
   const hasEnforcedCsp = httpHeaderOnlyCsp.size + metaCsp.size > 0;
   if (!hasEnforcedCsp) {
-    if (httpCspReportOnly.length === 0) {
+    // Content-Security-Policy-Report-Only is only allowed in headers, not in meta tags
+    // see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy-Report-Only
+    if (httpCspReportOnlyPolicies.length === 0) {
       output.result = Expectation.CspNotImplemented;
       return output;
     }
 
     try {
-      csp = parseCsp(httpCspReportOnly);
+      csp = parseCsp(httpCspReportOnlyPolicies);
       httpHeaderOnlyCsp = cloneCsp(csp);
-    } catch (e) {
+    } catch {
       output.result = Expectation.CspNotImplementedButReportingEnabled;
-      output.numPolicies = httpCspReportOnly.length;
+      output.numPolicies = httpCspReportOnlyPolicies.length;
       return output;
     }
 
-    metaCsp = new Map();
     output.result = Expectation.CspNotImplementedButReportingEnabled;
-    output.numPolicies = httpCspReportOnly.length;
+    output.numPolicies = httpCspReportOnlyPolicies.length;
   }
 
   output.policy = new Policy();
 
   // mark whether we saw csp there or not
-  output.http = httpCspPolicies.length > 0 || httpCspReportOnly.length > 0;
+  output.http =
+    httpCspPolicies.length > 0 || httpCspReportOnlyPolicies.length > 0;
   output.meta = equivCspPolicies.length > 0;
 
   // Get the various directives we look at
@@ -233,15 +225,13 @@ export function contentSecurityPolicyTest(
       }
     }
     output.policy.strictDynamic = true;
-  } else if (script_src.has("'strict-dynamic'")) {
-    if (output.result === null) {
-      output.result = Expectation.CspHeaderInvalid;
-    }
+  } else if (script_src.has("'strict-dynamic'") && output.result === null) {
+    output.result = Expectation.CspHeaderInvalid;
   }
 
   // Some checks look only at active/passive CSP directives
   // This could be inlined, but the code is quite hard to read at that point
-  const active_csp_sources = [...csp.entries()]
+  const active_csp_sources = [...csp]
     .filter(
       ([directive]) =>
         !PASSIVE_DIRECTIVES.has(directive) && directive !== "script-src"
@@ -257,10 +247,10 @@ export function contentSecurityPolicyTest(
   // Also don't allow overly broad schemes such as https: in either object-src or script-src
   // Likewise, if you don't have object-src or script-src defined, then all sources are allowed
   if (
-    [...script_src].filter((src) =>
+    [...script_src].some((src) =>
       DANGEROUSLY_BROAD_AND_UNSAFE_INLINE.has(src)
-    ).length > 0 ||
-    [...object_src].filter((src) => DANGEROUSLY_BROAD.has(src)).length > 0
+    ) ||
+    [...object_src].some((src) => DANGEROUSLY_BROAD.has(src))
   ) {
     if (output.result === null) {
       output.result = Expectation.CspImplementedWithUnsafeInline;
@@ -283,7 +273,7 @@ export function contentSecurityPolicyTest(
   }
 
   // Don't allow 'unsafe-eval' in script-src or style-src
-  if (new Set([...script_src, ...style_src]).has("'unsafe-eval'")) {
+  if (script_src.union(style_src).has("'unsafe-eval'")) {
     if (output.result === null) {
       output.result = Expectation.CspImplementedWithUnsafeEval;
     }
@@ -331,8 +321,8 @@ export function contentSecurityPolicyTest(
   }
 
   // Some other checks for the CSP analyzer
-  output.policy.antiClickjacking = ![...frame_ancestors].some((source) =>
-    DANGEROUSLY_BROAD.has(source)
+  output.policy.antiClickjacking = [...frame_ancestors].every(
+    (source) => !DANGEROUSLY_BROAD.has(source)
   );
   output.policy.insecureBaseUri = [...base_uri].some((source) =>
     DANGEROUSLY_BROAD_AND_UNSAFE_INLINE.has(source)

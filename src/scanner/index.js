@@ -1,3 +1,4 @@
+import { ALGORITHM_VERSION, ALL_TESTS, NUM_TESTS } from "../constants.js";
 import { MINIMUM_SCORE_FOR_EXTRA_CREDIT } from "../grader/charts.js";
 import {
   getGradeForScore,
@@ -5,9 +6,6 @@ import {
   getScoreModifier,
 } from "../grader/grader.js";
 import { retrieve } from "../retriever/retriever.js";
-import { ALGORITHM_VERSION } from "../constants.js";
-import { NUM_TESTS } from "../constants.js";
-import { ALL_TESTS } from "../constants.js";
 
 /**
  * @typedef {import("../types.js").ScanResult} ScanResult
@@ -56,14 +54,16 @@ export function analyzeScan(requests) {
   let uncurvedScore = scoreWithExtraCredit;
 
   results.forEach((result) => {
-    if (result.result) {
-      result.scoreDescription = getScoreDescription(result.result);
-      result.scoreModifier = getScoreModifier(result.result);
-      testsPassed += result.pass ? 1 : 0;
-      scoreWithExtraCredit += result.scoreModifier;
-      if (result.scoreModifier < 0) {
-        uncurvedScore += result.scoreModifier;
-      }
+    if (!result.result) {
+      return;
+    }
+
+    result.scoreDescription = getScoreDescription(result.result);
+    result.scoreModifier = getScoreModifier(result.result);
+    testsPassed += result.pass ? 1 : 0;
+    scoreWithExtraCredit += result.scoreModifier;
+    if (result.scoreModifier < 0) {
+      uncurvedScore += result.scoreModifier;
     }
   });
 

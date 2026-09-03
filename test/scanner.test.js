@@ -1,7 +1,10 @@
 import { describe, it } from "node:test";
+
 import { assert } from "chai";
+
 import { scan } from "../src/scanner/index.js";
 import { Site } from "../src/site.js";
+
 import { fixtureRequests, scanWithRequests } from "./helpers.js";
 
 /** @typedef {import("../src/scanner/index.js").ScanResult} ScanResult */
@@ -9,19 +12,19 @@ import { fixtureRequests, scanWithRequests } from "./helpers.js";
 describe("Scanner", () => {
   it("returns an error on an unknown host", async function () {
     const domain =
-      Array(223)
+      Array.from({ length: 223 })
         .fill(0)
-        .map(() => String.fromCharCode(Math.random() * 26 + 97))
+        .map(() => String.fromCodePoint(Math.floor(Math.random() * 26) + 97))
         .join("") + ".net";
     const site = Site.fromSiteString(domain);
     try {
       await scan(site);
       throw new Error("scan should throw");
-    } catch (e) {
-      if (e instanceof Error) {
-        assert.equal(e.message, "The site seems to be down.");
+    } catch (error) {
+      if (error instanceof Error) {
+        assert.equal(error.message, "The site seems to be down.");
       } else {
-        throw new Error("Unexpected error type");
+        throw new Error("Unexpected error type", { cause: error });
       }
     }
   });
@@ -30,12 +33,12 @@ describe("Scanner", () => {
     const requests = fixtureRequests("observatory-mozilla-org");
     const scanResult = scanWithRequests(requests);
 
-    assert.equal(scanResult.scan.algorithmVersion, 5);
+    assert.equal(scanResult.scan.algorithmVersion, 6);
     assert.equal(scanResult.scan.grade, "A+");
     assert.equal(scanResult.scan.score, 110);
     assert.equal(scanResult.scan.testsFailed, 0);
-    assert.equal(scanResult.scan.testsPassed, 10);
-    assert.equal(scanResult.scan.testsQuantity, 10);
+    assert.equal(scanResult.scan.testsPassed, 12);
+    assert.equal(scanResult.scan.testsQuantity, 12);
     assert.equal(scanResult.scan.statusCode, 200);
     assert.equal(scanResult.scan.responseHeaders["content-type"], "text/html");
   });
@@ -44,12 +47,12 @@ describe("Scanner", () => {
     const requests = fixtureRequests("mozilla-org");
     const scanResult = scanWithRequests(requests);
 
-    assert.equal(scanResult.scan.algorithmVersion, 5);
+    assert.equal(scanResult.scan.algorithmVersion, 6);
     assert.equal(scanResult.scan.grade, "B");
     assert.equal(scanResult.scan.score, 75);
     assert.equal(scanResult.scan.testsFailed, 2);
-    assert.equal(scanResult.scan.testsPassed, 8);
-    assert.equal(scanResult.scan.testsQuantity, 10);
+    assert.equal(scanResult.scan.testsPassed, 10);
+    assert.equal(scanResult.scan.testsQuantity, 12);
     assert.equal(scanResult.scan.statusCode, 200);
     assert.equal(
       scanResult.scan.responseHeaders["content-type"],

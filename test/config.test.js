@@ -2,7 +2,9 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
+
 import { assert } from "chai";
+
 import { load } from "../src/config.js";
 
 describe("config", () => {

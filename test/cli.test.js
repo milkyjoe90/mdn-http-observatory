@@ -1,5 +1,7 @@
 import { describe, it } from "node:test";
+
 import { assert } from "chai";
+
 import {
   buildCliRequestPolicy,
   formatScanResult,
@@ -30,14 +32,15 @@ describe("parseHeadersOption", () => {
 
   it("rejects header names with control characters", () => {
     assert.throws(
-      () => parseHeadersOption('{"X-Bad\\r\\nInjected": "value"}'),
+      () => parseHeadersOption(String.raw`{"X-Bad\r\nInjected": "value"}`),
       /Invalid customer header name/
     );
   });
 
   it("rejects header values with control characters", () => {
     assert.throws(
-      () => parseHeadersOption('{"X-Test": "value\\r\\nInjected: yes"}'),
+      () =>
+        parseHeadersOption(String.raw`{"X-Test": "value\r\nInjected: yes"}`),
       /Invalid customer header value/
     );
   });

@@ -1,20 +1,22 @@
+import { createHash } from "node:crypto";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
-import { createHash } from "node:crypto";
-import { assert } from "chai";
+
 import { AxiosHeaders } from "axios";
-import {
-  createRequestSigningHeadersSignerFromConfig,
-  RequestSigningHeadersSigner,
-} from "../src/retriever/request-signing.js";
-import { Session } from "../src/retriever/session.js";
+import { assert } from "chai";
+
 import {
   mergeRequestPolicies,
   normalizeRequestPolicy,
   resolveRequestPolicyHeaders,
 } from "../src/retriever/request-policy.js";
+import {
+  RequestSigningHeadersSigner,
+  createRequestSigningHeadersSignerFromConfig,
+} from "../src/retriever/request-signing.js";
+import { Session } from "../src/retriever/session.js";
 
 const testPem =
   "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIFyanLfQsoXbxClFLDeTcepr5MpqIv6ZzvO7Mqkj5mlL\n-----END PRIVATE KEY-----";
@@ -284,7 +286,7 @@ describe("request policy", () => {
 
   it("generates managed request-signing headers for HTTP and HTTPS requests", () => {
     const signer = new RequestSigningHeadersSigner(testPem, {
-      now: () => 1700000000,
+      now: () => 1_700_000_000,
     });
     const requestPolicy = normalizeRequestPolicy({
       enableRequestSigning: true,
@@ -315,7 +317,7 @@ describe("request policy", () => {
 
   it("signs the request body when present", () => {
     const signer = new RequestSigningHeadersSigner(testPem, {
-      now: () => 1700000000,
+      now: () => 1_700_000_000,
       signatureAgent: "https://example.com/.well-known/signing",
     });
 
@@ -353,7 +355,7 @@ describe("request policy", () => {
 
   it("lets customer headers override request defaults when signing", () => {
     const signer = new RequestSigningHeadersSigner(testPem, {
-      now: () => 1700000000,
+      now: () => 1_700_000_000,
     });
     const requestPolicy = normalizeRequestPolicy({
       customerHeaders: {
@@ -376,7 +378,7 @@ describe("request policy", () => {
 
   it("uses customer headers when signing through the Session interceptor", () => {
     const signer = new RequestSigningHeadersSigner(testPem, {
-      now: () => 1700000000,
+      now: () => 1_700_000_000,
     });
     const session = new Session(new URL("https://example.com/"), {
       requestPolicy: {

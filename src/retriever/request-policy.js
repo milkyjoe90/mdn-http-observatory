@@ -11,7 +11,13 @@ const VALID_HEADER_NAME_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
  * @returns {boolean}
  */
 function hasControlCharacters(value) {
-  return /[\0-\x1F\x7F]/.test(value);
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint !== undefined && (codePoint <= 0x1f || codePoint === 0x7f)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -80,7 +86,7 @@ export function normalizeHeaderEntries(headers) {
   }
 
   if (typeof headers !== "object") {
-    throw new Error("Invalid customer header collection.");
+    throw new TypeError("Invalid customer header collection.");
   }
 
   return Object.entries(headers)
@@ -190,7 +196,7 @@ export function resolveRequestPolicyHeaders({
 
   const allowCustomerHeaders =
     requestUrl.protocol === "https:" ||
-    requestPolicy.sendCustomerHeadersOverHttp === true;
+    requestPolicy.sendCustomerHeadersOverHttp;
   const customerHeaders = allowCustomerHeaders
     ? toHeaderObject(
         requestPolicy.customerHeaders.filter(

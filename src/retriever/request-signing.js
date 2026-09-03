@@ -1,10 +1,10 @@
-import { readFileSync } from "node:fs";
 import {
   createHash,
   createPrivateKey,
   createPublicKey,
   sign,
 } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 const DEFAULT_SIGNATURE_AGENT =
   "https://request-signer.invalid/.well-known/http-message-signatures-directory";
@@ -15,7 +15,7 @@ const DEFAULT_EXPIRY_TTL_SECONDS = 120;
 const DEFAULT_SIGNATURE_TAG = "request-signing";
 
 /**
- * @typedef {Object} RequestSigningConfig
+ * @typedef {object} RequestSigningConfig
  * @property {string} [privateKeyPath]
  * @property {string} [signatureAgent]
  * @property {string} [acceptHeader]
@@ -218,7 +218,8 @@ export function createRequestSigningHeadersSignerFromConfig(config = {}) {
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     throw new Error(
-      `Unable to read request signing private key from ${privateKeyPath}: ${reason}`
+      `Unable to read request signing private key from ${privateKeyPath}: ${reason}`,
+      { cause: error }
     );
   }
 
